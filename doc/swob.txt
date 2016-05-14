@@ -1,0 +1,1018 @@
+Ken Dickey, "Scheming with Objects", AI Expert 7(10):24-33, October 1992.
+ 
+		 Scheming  with  Objects
+
+
+
+There is a saying--attributed to Norman Adams--that "Objects are a
+poor man's closures." In this article we discuss what closures are and
+how objects and closures are related, show code samples to make these
+abstract ideas concrete, and implement a Scheme Object System which
+solves the problems we uncover along the way. 
+
+
+
+THE CLASSICAL OBJECT MODEL
+
+
+Before discussing object oriented programming in Scheme, it pays to
+take a look at the classical model so that we have something to
+compare with and in order to clarify some of the terminology.  One of
+the problems that the OO movement created for itself was the use of
+new terms to get away from older concepts and the confusion this has
+caused.  So before going further I would like to give some of my own
+definitions and a simple operational model.  The model is not strictly
+correct as most compiled systems use numerous short cuts and special
+optimization tricks, but it is close enough for most practical
+purposes and has been used to implement OO programming in imperative
+languages. 
+
+An object "instance" consists of local (encapsulated) state and a
+reference to shared code which operates on its state.  The easy way to
+think of this is as a C struct or Pascal record which has one field
+reserved for a pointer to its shared code environment and other slots
+for its instance variables.  Each procedure in this shared environment
+is called a "method." A "class" is code which is can generate
+instances (new records) by initializing their fields, including a
+pointer to the instance's shared method environment.  The environment
+just maps method names to their values (their code).  Each method is a
+procedure which takes the record it is operating on as its first,
+sometimes hidden, argument.  The first argument is called the
+"reciever" and typically aliased to the name "self" within the
+procedure's code. 
+
+In order to make code management easy, object oriented systems such as
+Actor or Smalltalk wish to deal with code as objects and the way this
+is done is by making each class an object instance as well.  In order
+to manipulate the class's code, however a "meta-class" is typically
+defined and in some cases a meta-meta...  Well, you get the idea.
+Many people have spent a great deal of time in theories of how to
+"ground" such systems without infinite recursion.  To confuse things
+further, many object systems have an object named "object" and a class
+object named "class"--so that the class of the "class" object is
+`class'. 
+
+By making every data object an instance of the OO system, uniformity
+demands that numbers are added, e.g. 1 + 2 by "sending the message" +
+to the object 1 with the argument 2.  This has the advantage that + is
+polymorphic--it can be applied to any data object.  Unfortunately,
+polymorphism also makes optimization hard in that the compiler can no
+longer make assumptions about + and may not be able to do constant
+folding or inlining. 
+
+The set of methods an object responds to is called a "protocol".
+Another way of saying this is that the functions or operations that
+are invokeable on an object make up its interface.  More than one
+class of object may respond to the same protocol--i.e. many different
+types of objects have the same operation names available. 
+
+
+
+
+OBJECT BASED MESSAGE PASSING
+
+
+So how can this "message passing" be implemented with lexical
+closures?  And what are these closure things anyway? 
+
+References within a function to variables outside of the local
+scope--free references--are resolved by looking them up in the
+environment in which the function finds itself.  When a language is
+lexically scoped, you see the shape of the environment when you
+read--lex--the code.  In Scheme, when a function is created it
+remembers the environment in which it was created.  Free names are
+looked up in that environment, so the environment is said to be
+"closed over" when the function is created.  Hence the term "closure."
+
+
+An example may help here:
+
+(define (CURRIED-ADD x) (lambda (y) (+ x y))
+
+(define ADD8 (curried-add 8))
+
+(add8 3)	-> 11
+
+
+
+When add8 is applied to its argument, we are doing ((lambda (y) (+ x y)) 3)
+
+The function add8 remembers that X has the value 8.  It gets the value
+Y when it is applied to 3.  It finds that + is the addition function.
+So (add8 3) evaluates to 11. 
+
+(define ADD5 (curried-add 5)) makes a new function which shares the
+curried-add code (lambda (y) (+ x y)), but remembers that in its
+closed over environment, X has the value 5. 
+
+Now that we have a way to create data objects, closures, which share
+code but have different data, we just need a "dispatching function" to
+which we can pass the symbols we will use for messages:
+
+(define (MAKE-POINT the-x the-y)
+  (lambda (message)
+     (case message
+        ((x)  (lambda () the-x)) ;; return a function which returns the answer
+        ((y)  (lambda () the-y))
+        ((set-x!) 
+             (lambda (new-value)
+                     (set! the-x new-value)  ;; do the assignment
+                      the-x))                ;; return the new value
+        ((set-y!) 
+             (lambda (new-value)
+                     (set! the-y new-value)
+                      the-y))
+       (else (error "POINT: Unknown message ->" message))
+) )  )
+
+
+
+(define p1 (make-point 132 75))
+
+(define p2 (make-point 132 57))
+
+((p1 'x))		-> 132
+
+((p1 'set-x!) 5)	-> 5
+
+
+We can even change the message passign style to function calling style:
+
+(define (x obj) ((obj 'x))
+
+(define (set-x! obj new-val) ((obj 'set-x!) new-val))
+
+
+(set-x! p1 12) 	-> 12 
+
+(x p1) 		-> 12
+
+(x p2)		-> 132	;; p1 and p2 share code but have different local data
+
+
+Using Scheme's lexical scoping, we can also define make-point as:
+
+(define (MAKE-POINT the-x the-y)
+
+  (define (get-x) the-x)	;; a "method"
+
+  (define (get-y) the-y)
+
+  (define (set-x! new-x) 
+     (set! the-x new-x)
+     the-x)
+
+  (define (set-y! new-y) 
+     (set! the-y new-y)
+     the-y)
+
+  (define (self message)
+     (case message
+        ((x)   	  get-x) ;; return the local function
+        ((y)  	  get-y)
+        ((set-x!) set-x!)
+        ((set-y!) set-y!)
+        (else (error "POINT: Unknown message ->" message))))
+
+  self	 ;; the return value of make-point is the dispatch function
+)
+
+
+
+
+ADDING INHERITANCE
+
+
+"Inheritance" means that one object may be specialized by adding to
+and/or shadowing another's behavior.  It is said that "object based"
+programming together with inheritance is "object oriented" programming.
+How can we add inheritance to the above picture?  By delegating to
+another object! 
+
+
+(define (MAKE-POINT-3D a b the-z)
+  (let ( (point (make-point a b)) )
+
+   (define (get-z) the-z)
+
+   (define (set-z! new-value)
+      (set! the-z new-value)
+      the-z)
+
+   (define (self message)
+     (case message
+         ((z) 		get-z)
+         ((set-z!) 	set-z!)
+         (else (point message))))
+
+  self
+)
+
+(define p3 (make-point-3d 12 34 217))
+
+(x p3)		-> 12
+
+(z p3)		-> 217
+
+(set-x! p3 12)	-> 12
+
+(set-x! p2 12)	-> 12
+
+(set-z! p3 14)	-> 14
+
+Note that in this style, we are not required to have a single distinguished
+base object, "object"--although we may do so if we wish.
+
+
+
+
+WHAT IS WRONG WITH THE ABOVE PICTURE ?
+
+
+While the direct strategy above is perfectly adequate for OO
+programming, there are a couple of rough spots.  For example, how can
+we tell which functions are points and which are not?  We can define a
+POINT?  predicate, but not all Scheme data objects will take a 'point?
+message.  Most will generate error messages, but some will just "do
+the wrong thing."
+
+(define (POINT? obj) (and (procedure? obj) (obj 'point?)))
+
+(point? list) 	-> (point?)  ;; a list with the symbol 'point?
+
+We want a system in which all objects participate and in which we can
+mix styles.  Building dispatch functions is repetitive and can
+certainly be automated--and let's throw in multiple inheritance while
+we are at it.  Also, it is generally a good design principle to
+separate interface from implementation, so we will. 
+
+
+
+ONE SET OF SOLUTIONS
+
+The following is one of a large number of possible implementations.
+Most Scheme programmers I know have written at least one object system
+and some have written several.  Let's first look at the interface, then
+how it is used, then how it was implemented.
+
+In order to know what data objects are "instances", we have a
+predicate, INSTANCE?, which takes a single argument and answers #t or
+#f.  
+
+For each kind of object is also useful to have a predicate, so we
+define a predicate maker: (DEFINE-PREDICATE <opname?>) which by default
+answers #f.  
+
+To define operations which operate on any data, we need a default
+behavior for data objects which don't handle the operation:
+(DEFINE-OPERATION (opname self arg ...) default-body).  If
+we don't supply a default-behavior, the default default-behavior
+is to generate an error.
+
+We certainly need to return values which are instances of our object
+system: (OBJECT operation... ), where an operation has the form:
+((opname self arg ...) body).  There is also a LET-like form for
+multiple inheritance:
+   (OBJECT-WITH-ANCESTORS ( (ancestor1 init1) ...) 
+	operation ...).
+In the case of multiple inherited operations with the same identity,
+the operation used is the one found in the first ancestor in the
+ancestor list.
+
+And finally, there is the "send to super" problem, where we want to
+operate as an ancestor, but maintain our own self identity {more on
+this below}:  (OPERATE-AS component operation composite arg ...).
+
+Note that in this system, code which creates instances is just code, so
+there there is no need to define "classes" and no meta-<anything>!
+
+
+EXAMPLES
+
+O.K., let's see how this fits together.  First, another look at
+points. ***See LISTING: Points revisited***
+
+(define P2 (make-point 123 32131))
+(define P3 (make-point-3d 32 121 3232))
+(size "a string")	-> 8
+(size p2)		-> 2
+(size p3)		-> 3
+(point? p2)		-> #t
+(point? p3)		-> #t
+(point? "a string")	-> #f
+(x p2)			-> 123
+(x p3)			-> 32
+(x "a string")		-> ERROR: Operation not handled: x "a string"
+(print p2 #t)		#<point: 123 32131>
+(print p3 #t)   	#<3D-point: 32 121 3232>
+(print "a string" #t) 	"a string"
+
+Things to notice...
+  Interface is separate from implementation
+  All objects participate
+  Inheritance is simplified
+  Print unifies treatment of objects--each decides how it is to be displayed
+  Default behaviors are useful
+  
+
+Now lets look at a more interesting example, a simplified savings
+account with history and passwords.
+
+
+*** See LISTING: Bank accounts ***
+
+
+(define FRED  (make-person "Fred" 19 "573-19-4279" #xFadeCafe))
+(define SALLY
+  (make-account "Sally" 26 "629-26-9742" #xFeedBabe 263 bank-password))
+
+(print fred #t)		#<Person: Fred age: 19>
+(print sally #t)	#<Bank-Customer Sally>
+(person? sally)		-> #t
+(bank-account? sally)	-> #t
+(ssn fred  #xFadeCafe)	-> "573-19-4279"
+(ssn sally #xFeedBabe)	-> "629-26-9742"
+(add sally 130) 	New balance: $393
+(add sally 55)		New balance: $448
+
+; the bank can act in Sally's behalf
+(get-account-history sally bank-password)  		--> (448 393 263)
+(withdraw sally 100 (get-pin sally bank-password))	New balance: $348
+(get-account-history sally bank-password)          	--> (348 448 393 263)
+
+;; Fred forgets
+(ssn fred 'bogus)	Bad password: bogus	;; Fred gets another chance
+
+;; Sally forgets
+(ssn sally 'bogus)	CALL THE POLICE!!	;; A more serious result..
+
+Now we see the reason we need OPERATE-AS.  The when the bank-account
+object delegates the SSN operation to its ancestor, person, SELF is
+bound to the bank-account object--not the person object.  This means
+that while the code for SSN is inherited from person, the BAD-PASSWORD
+operation of the bank-account is used.
+
+This is an important behavior to have in an object system.  If there
+were no OPERATE-AS, code would have to be duplicated in order to
+implement the stricter form of BAD-PASSWORD.  With OPERATE-AS, we can
+safely share code while keeping operations localized within the
+inheritance hierarchy.
+
+
+
+OUR IMPLEMENTATION
+
+Given the sophisticated behavior of our object system, the
+implementation is surprisingly small.
+
+*** See LISTING: yasos ***
+
+Unlike some other languages, Scheme does not have a standard way of
+defining opaque types.  In order to distinguish data objects which are
+instances of our object system, we just uniquely tag a closure.  As we
+are only introducing one new datatype it is not much work to hide this
+by rewriting Scheme's WRITE and DISPLAY routines. 
+
+In order to allow lexical scoping of objects and operations, the
+values of operations, rather than their names, are used in the
+dispatch functions created for objects.  Those of you who have used
+languages such as Smalltalk or Actor may have been bitten by the
+inadvertant name collisions in the single, global environment.
+
+Note that there are no global tables.  A general rule of thumb is that
+for less than 100 elements, linear search beats hashing.  While we can
+speed up operation dispatch by some simple caching, the general
+performance for this system will be pretty good up through moderately
+large systems.  Also, we can optimize the implementation with no
+change to the interface.  If our systems start getting too slow, its
+time to smarten the compiler.
+
+
+
+HOW THIS COMPARES TO THE CLASSICAL MODEL
+
+It is time to compare this implementation to the model given at the
+beginning of this article.
+
+One thing you may notice right away is the power of closures.  The
+object system is small and simpler than the class model.  There are no
+grounding problems.  No "Meta".  I find it interesting that
+Whitewater's Actor 4.0 implements code sharing between classes (which
+they call multiple inheritance) in an attempt to get more of the
+benefits that closures provide directly.
+
+The Scheme solution is also more general.  It keeps lexical scoping,
+and one can freely mix OO with functional & imperative styles.
+
+Programming Environment work still has to be done for code management
+& debugging (e.g. doing an object inspector), but OO helps here just
+as in other OO systems.
+
+Separating the interface from the implementation is a better software
+engineering solution than the classical model.  We can define our
+"protocols" independently of their implementation.  This helps us hide
+our implementation.  One might think that object oriented programming
+in general would solve the problems here, but this has not been the
+case because people still use inheritance to share code rather than
+just to share abstractions.  An example of this is the complex
+behavior of Smalltalk dictionaries because they inherit the
+implementation of Sets.  While code sharing is a benefit of OO it is
+still considered bad form when your code breaks because of a change in
+the implementation of an inherited abstraction.
+
+Finally, I would like to point out that one can implement other OO
+models directly in Scheme, including smaller, simpler ones!  You can
+also implement the classical model (e.g. see D. Friedman, M. Wand, &
+C. Haynes: _Essentials of Programming Languages_, McGraw Hill, 1992). 
+
+Remember, your programming language should be part of the solution, not
+part of your problems.  Scheme for success!
+
+
+---------------------------EndOfArticle-------------------------------
+
+***************************
+* LISTING: Points revisited
+***************************
+
+;;---------------------
+;; general operations
+;;---------------------
+
+(define-operation (PRINT obj port) 
+  (format port  ;; *** see LISTING: format ***
+          ;; if an instance does not have a PRINT operation..
+          (if (instance? obj) "#<INSTANCE>" "~s") 
+          obj
+) )
+
+(define-operation (SIZE obj)
+  ;; default behavior
+  (cond   
+    ((vector? obj) (vector-length obj))
+    ((list?   obj) (length obj))
+    ((pair?   obj) 2)
+    ((string? obj) (string-length obj))
+    ((char?   obj) 1)
+    (else 
+      (error "Operation not supported: size" obj))
+) )
+
+
+;;----------------
+;; point interface
+;;----------------
+
+(define-predicate POINT?)  ;; answers #f (false) by default
+(define-operation (X obj))
+(define-operation (Y obj))
+(define-operation (SET-X! obj new-x))
+(define-operation (SET-Y! obj new-y))
+
+
+;;---------------------
+;; point implementation
+;;---------------------
+
+(define (MAKE-POINT the-x the-y)
+  (object
+     ((POINT? self) #t) ;; yes, this is a point object
+     ((X self) the-x)
+     ((Y self) the-y)
+     ((SET-X! self val)
+      (set! the-x val)
+      the-x)
+     ((SET-Y! self val)
+      (set! the-y val)
+      the-y)
+     ((SIZE self) 2)
+     ((PRINT self port)
+      (format port "#<point: ~a ~a>" (x self) (y self)))
+) )
+
+;;-----------------------------
+;; 3D point interface additions
+;;-----------------------------
+
+(define-operation (Z obj))
+(define-operation (SET-Z! obj new-z))
+
+
+;;------------------------
+;; 3D point implementation
+;;------------------------
+
+(define (MAKE-POINT-3D the-x the-y the-z)
+   (object-with-ancestors ( (a-point (make-point the-x the-y)) )
+      ((Z self) the-z)
+      ((SET-Z! self val) (set! the-z val) the-z)
+      ;; override inherited SIZE and PRINT operations
+      ((SIZE self) 3)
+      ((PRINT self port)
+       (format port "#<3D-point: ~a ~a ~a>" (x self) (y self) (z self)))
+)  )
+
+***------------------------------------------------------------
+
+***********************
+*LISTING: Bank accounts
+***********************
+
+
+;;-----------------
+;; person interface
+;;-----------------
+
+(define-predicate PERSON?)
+
+(define-operation (NAME obj))
+(define-operation (AGE obj))
+(define-operation (SET-AGE! obj new-age))
+(define-operation (SSN obj password)) ;; Social Security # is protected
+(define-operation (NEW-PASSWORD obj old-passwd new-passwd))
+(define-operation (BAD-PASSWORD obj bogus-passwd)
+  ;; assume internal (design) error
+  (error (format #f "Bad Password: ~s given to ~a~%" 
+                    bogus-passwd
+		    (print obj #f)))
+)
+
+
+;;----------------------
+;; person implementation
+;;----------------------
+
+(define (MAKE-PERSON a-name an-age a-SSN the-password)
+  (object
+    ((PERSON? self) #t)
+    ((NAME self) a-name)
+    ((AGE self) an-age)
+    ((SET-AGE! self val) (set! an-age val) an-age)
+    ((SSN self password)
+     (if (equal? password the-password)
+         a-SSN
+	 (bad-password self password))
+    )
+    ((NEW-PASSWORD obj old-passwd new-passwd)
+     (cond
+       ((equal? old-passwd the-password) (set! the-password new-passwd) self)
+       (else (bad-password self old-passwd))
+    ))
+    ((BAD-PASSWORD self bogus-passwd)
+     (format #t "Bad password: ~s~%" bogus-passwd))  ;; let user recover
+    ((PRINT self port)
+	 (format port "#<Person: ~a age: ~a>" (name self) (age self)))
+) )
+
+;;--------------------------------------------
+;; account-history and bank-account interfaces
+;;--------------------------------------------
+
+(define-predicate BANK-ACCOUNT?)
+
+(define-operation (CURRENT-BALANCE account pin))
+(define-operation (ADD obj amount))
+(define-operation (WITHDRAW obj amount pin))
+(define-operation (GET-PIN account master-password))
+(define-operation (GET-ACCOUNT-HISTORY account master-password))
+
+;;-------------------------------
+;; account-history implementation
+;;-------------------------------
+;; put access to bank database and report generation here
+
+(define (MAKE-ACCOUNT-HISTORY initial-balance a-PIN master-password)
+  ;; history is a simple list of balances -- no transaction times
+  (letrec ( (history (list initial-balance)) 
+            (balance (lambda () (car history))) ; balance is a function
+            (remember 
+              (lambda (datum) (set! history (cons datum history))))
+          )
+    (object
+      ((BANK-ACCOUNT? self) #t)
+      ((ADD self amount) ;; bank will accept money without a password
+       (remember (+ amount (balance)))
+       ;; print new balance
+       (format #t "New balance: $~a~%" (balance)) 
+      )
+      ((WITHDRAW self amount pin)
+       (cond
+          ((not (equal? pin a-pin)) (bad-password self pin))
+	  ((< (- (balance) amount) 0)
+	   (format #t 
+	          "No overdraft~% Can't withdraw more than you have: $~a~%"
+		  (balance))
+          )
+	  (else
+	    (remember (- (balance) amount))
+            (format #t "New balance: $~a~%" (balance)))
+      ))
+      ((CURRENT-BALANCE self password)
+       (if (or (eq? password master-password) (equal? password a-pin))
+           (format #t "Your Balance is $~a~%" (balance))
+	   (bad-password self password)
+      )
+      ;; only bank has access to account history
+      ((GET-ACCOUNT-HISTORY account password) 
+       (if (eq? password master-password)
+           history
+	   (bad-password self password)
+      ))
+) ) )
+
+;;----------------------------
+;; bank-account implementation
+;;----------------------------
+
+(define (MAKE-ACCOUNT a-name an-age a-SSN a-PIN initial-balance master-password)
+
+  (object-with-ancestors 
+
+     ( (customer (make-person a-name an-age a-SSN a-PIN))
+       (account  (make-account-history initial-balance a-PIN master-password))
+     )
+
+    ((GET-PIN self password)
+     (if (eq? password master-password)
+	 a-PIN
+	 (bad-password self password)
+    ))
+    ((GET-ACCOUNT-HISTORY self password)
+     (operate-as account get-account-history self password)
+    )
+    ;; our bank is very conservative...
+    ((BAD-PASSWORD self bogus-passwd)
+     (format #t "~%CALL THE POLICE!!~%")  
+    )
+    ;; protect the customer as well
+    ((SSN self password) 
+     (operate-as customer SSN self password)
+    )
+    ((PRINT self port)
+     (format port "#<Bank-Customer ~a>" (name self)))
+) )
+
+
+
+***----------------------------------------------------------------
+
+******************
+* LISTING: yasos *
+******************
+;; FILE		"oop.scm"
+;; IMPLEMENTS	YASOS: Yet Another Scheme Object System
+;; AUTHOR	Kenneth Dickey
+;; DATE		1992 March 1
+;; LAST UPDATED	1992 March 5
+
+;; REQUIRES	R4RS Syntax System
+
+;; NOTES: An object system for Scheme based on the paper by
+;; Norman Adams and Jonathan Rees: "Object Oriented Programming in
+;; Scheme", Proceedings of the 1988 ACM Conference on LISP and 
+;; Functional Programming, July 1988 [ACM #552880].
+
+;;
+;; INTERFACE:
+;;
+;; (DEFINE-OPERATION (opname self arg ...) default-body)
+;;
+;; (DEFINE-PREDICATE opname)
+;;
+;; (OBJECT ((name self arg ...) body) ... )
+;;
+;; (OBJECT-WITH-ANCESTORS ( (ancestor1 init1) ...) operation ...)
+;;
+;; in an operation {a.k.a. send-to-super}
+;;   (OPERATE-AS component operation self arg ...)
+;;
+
+
+;; INSTANCES
+
+; (define-predicate instance?)
+; (define (make-instance dispatcher)
+;    (object
+; 	((instance?  self) #t)
+;       ((instance-dispatcher self) dispatcher)
+; )  )
+
+(define make-instance 'bogus)  ;; defined below
+(define instance?     'bogus)
+(define-syntax INSTANCE-DISPATCHER  ;; alias so compiler can inline for speed
+   (syntax-rules () ((instance-dispatcher inst) (cdr inst)))
+)
+
+(let ( (instance-tag "instance") )  ;; Make a unique tag within a local scope.
+				    ;; No other data object is EQ? to this tag.
+  (set! MAKE-INSTANCE
+     (lambda (dispatcher) (cons instance-tag dispatcher)))
+
+  (set! INSTANCE?
+     (lambda (obj) (and (pair? obj) (eq? (car obj) instance-tag))))
+)
+
+;; DEFINE-OPERATION
+
+(define-syntax DEFINE-OPERATION
+  (syntax-rules ()
+    ((define-operation (<name> <inst> <arg> ...) <exp1> <exp2> ...)
+     ;;=>
+     (define <name>
+       (letrec ( (self
+                  (lambda (<inst> <arg> ...)
+		   (cond
+		     ((and (instance? <inst>) 
+		           ((instance-dispatcher <inst>) self))
+		      => (lambda (operation) (operation <inst> <arg> ...))
+                     )
+		     (else <exp1> <exp2> ...)
+            ) ) )  )
+        self)
+  ))
+  ((define-operation (<name> <inst> <arg> ...) ) ;; no body
+   ;;=>
+   (define-operation (<name> <inst> <arg> ...)
+      (error "Operation not handled" 
+             '<name> 
+             (format #f (if (instance? <inst>) "#<INSTANCE>" "~s") <inst>)))
+  ))
+) )
+
+
+;; DEFINE-PREDICATE
+
+(define-syntax DEFINE-PREDICATE
+  (syntax-rules ()
+    ((define-predicate <name>)
+     ;;=>
+     (define-operation (<name> obj) #f)
+    )
+) )
+
+
+;; OBJECT
+
+(define-syntax OBJECT
+  (syntax-rules ()
+    ((object ((<name> <self> <arg> ...) <exp1> <exp2> ...) ...)
+    ;;=>
+     (let ( (table
+	       (list (cons <name>
+		           (lambda (<self> <arg> ...) <exp1> <exp2> ...))
+                      ...
+             ) ) 
+            )
+      (make-instance
+        (lambda (op)
+	  (cond
+            ((assq op table) => cdr)
+            (else #f)
+) ) )))) )
+
+
+;; OBJECT with MULTIPLE INHERITANCE  {First Found Rule}
+
+(define-syntax OBJECT-WITH-ANCESTORS
+  (syntax-rules ()
+    ((object-with-ancestors ( (<ancestor1> <init1>) ... ) <operation> ...)
+    ;;=>
+     (let ( (<ancestor1> <init1>) ...  )
+      (let ( (child (object <operation> ...)) )
+       (make-instance
+         (lambda (op) 
+            (or ((instance-dispatcher child) op)
+	        ((instance-dispatcher <ancestor1>) op) ...
+       ) )  )
+    )))
+) )
+
+
+;; OPERATE-AS  {a.k.a. send-to-super}
+
+; used in operations/methods
+
+(define-syntax OPERATE-AS
+  (syntax-rules ()
+   ((operate-as <component> <op> <composit> <arg> ...)
+   ;;=>
+    (((instance-dispatcher <component>) <op>) <composit> <arg> ...)
+  ))
+)
+
+
+;;			--- End YASOS ---
+
+
+*******************
+* LISTING: format *
+*******************
+;
+; FILE:		"format.scm"
+; IMPLEMENTS:	Format function {Scheme} -- see documentation below.
+; AUTHOR:	Ken Dickey
+; DATE:		1988
+; LAST UPDATED:	1992 January 8 -- now implements ~& option
+;		1991 November 25 -- now uses string ports
+
+; NOTES:	Imports PRETTY-PRINT (~g) and OBJECT->STRING
+
+;		Pretty print and various other code is available via ftp
+;		from the Scheme Repository on nexus.yorku.ca [130.63.9.1] 
+;		under pub/scheme.  Contact: Ozan Yigit: oz@nexus.yorku.ca.
+
+;;  ========
+;;  FUNCTION: (FORMAT <port> <format-string> . <args>)
+;;  ========
+;;  
+;;  RESULT: returns zero-length symbol or a string; has side effect of
+;;  printing according to <format-string>.  If <port> is #t the output is
+;;  to the current output port.  If <port> is #f, a formatted string is
+;;  returned as the result of the call.  Otherwise <port> must be an
+;;  output port.  <format-string> must be a string.  Characters are output
+;;  as if the string were output by the DISPLAY function with the
+;;  exception of those prefixed by a tilde (~) as follows [note that options
+;;  which take arguments remove them from the argument list (they are said to
+;;  be `consumed')]:
+;;
+;;option  mnemonic: description
+;;------  ------------------------
+;;   ~a  any: display the argument (as for humans).
+;;   ~s  slashified: write the argument (as for parsers).
+;;   ~d  decimal: the integer argument is output in decimal format.
+;;   ~x  hexadecimal: the integer argument is output in hexadecimal format.
+;;   ~o  octal: the integer argument is output in octal format.
+;;   ~b  binary: the integer argument is output in binary format.
+;;   ~p  plural: if the argument is > than 1, a lower case 's' is printed.
+;;   ~c  character: the next argument is displayed as a character.
+;;   ~_  space: output a space character.
+;;   ~%  newline: output a newline character.
+;;   ~&  freshline: unless at the beginning of a line, same as ~%, else ignored
+;;   ~~  tilde: output a tilde.
+;;   ~t  tab: output a tab charcter. **implemented, but system dependent**
+;;   ~g  glorify: pretty print the argument (typically an s-expression).
+;;   ~|  page seperator: output a page seperator.
+;;   ~?  indirection: take the next argument as a format string and consume
+;;       further arguments as appropriate, then continue to process the current
+;;       format string.
+;;
+
+;----- IMPLEMENTATION SPECIFIC OPTIMIZATIONS
+
+;; (##declare (standard-bindings) (fixnum)) ;; GAMBIT (v1.71)
+
+;---------- FORMAT
+
+
+(define FORMAT
+
+ (let ( (LAST-WAS-NEWLINE #f)  ; state shared between invocations
+	(ASCII-TAB   (integer->char  9))
+	(ASCII-FF    (integer->char 12))
+	(DONT-PRINT  (string->symbol ""))  ;; a zero character symbol
+      )
+
+  (lambda (<output-port> <format-string> . <args>)
+
+  (letrec (
+	   (PORT (cond ((output-port? <output-port>) <output-port>)
+		       ((eq? <output-port> #t) (current-output-port))
+		       ((eq? <output-port> #f) (open-output-string))
+		       (else (error "format: bad port -> " <output-port>)))
+           )
+	   (RETURN-VALUE  (if (eq? <output-port> #f)  ;; format to a string
+			      (lambda () (get-output-string port))
+			      (lambda () dont-print))
+           )
+          )
+
+    (define (FORMAT-HELP format-strg arglyst)
+
+      (letrec
+	  (
+	   (LENGTH-OF-FORMAT-STRING (string-length format-strg))
+
+	   (ANYCHAR-DISPATCH
+	    (lambda (pos arglist last-char-was-nl)
+	      (if (>= pos length-of-format-string)
+		  (begin
+		    (set! last-was-newline last-char-was-nl)
+		    arglist ; used for ~? continuance
+		  )
+		  (let ( (char (string-ref format-strg pos)) )
+		    (cond
+		     ((eq? char #\~)
+		      (tilde-dispatch (+ pos 1) arglist last-char-was-nl))
+		     (else
+		      (write-char char port)
+		      (anychar-dispatch (+ pos 1) arglist #f)
+		      ))
+		    ))
+	      )) ; end anychar-dispatch
+
+	    (TILDE-DISPATCH
+	     (lambda (pos arglist last-char-was-nl)
+	       (cond
+		((>= pos length-of-format-string)
+		 (write-char #\~ port) ; tilde at end of string is just output
+		 (set! last-was-newline last-char-was-nl)
+		 arglist ; used for ~? continuance
+		 )
+		(else
+		 (case (char-upcase (string-ref format-strg pos))
+		   ((#\A)	; Any -- for humans
+		    (display (car arglist) port)
+		    (anychar-dispatch (+ pos 1) (cdr arglist) #f)
+		    )
+		   ((#\S)	; Slashified -- for parsers
+		    (write (car arglist) port)
+		    (anychar-dispatch (+ pos 1) (cdr arglist) #f)
+		    )
+		   ((#\D)	; Decimal
+		    (display (number->string (car arglist) 10) port)
+		    (anychar-dispatch (+ pos 1) (cdr arglist) #f)
+		    )
+		   ((#\X)	; Hexadecimal
+		    (display (number->string (car arglist) 16) port)
+		    (anychar-dispatch (+ pos 1) (cdr arglist) #f)
+		    )
+		   ((#\O)	; Octal
+		    (display (number->string (car arglist)  8) port)
+		    (anychar-dispatch (+ pos 1) (cdr arglist) #f)
+		    )
+		   ((#\B)	; Binary
+		    (display (number->string (car arglist)  2) port)
+		    (anychar-dispatch (+ pos 1) (cdr arglist) #f)
+		    )
+		   ((#\C)	; Character
+		    (write-char (car arglist) port) 
+		    (anychar-dispatch (+ pos 1) (cdr arglist) #f)
+		    )
+		   ((#\P)	; Plural
+		    (if (= (car arglist) 1)
+			#f ; no action
+			(write-char #\s port))
+		    (anychar-dispatch (+ pos 1) (cdr arglist) #f)
+		    )
+		   ((#\~)	; Tilde
+		    (write-char #\~ port)
+		    (anychar-dispatch (+ pos 1) arglist #f)
+		    )
+		   ((#\%)	; Newline
+		    (write-char #\newline port)
+		    (anychar-dispatch (+ pos 1) arglist #t)
+		    )
+		   ((#\_)	; Space
+		    (write-char #\space port)
+		    (anychar-dispatch (+ pos 1) arglist #f)
+		    )
+		   ((#\&)	; Freshline
+		    (if (not last-char-was-nl)
+			(write-char #\newline port))
+		    (anychar-dispatch (+ pos 1) arglist #t)
+		    )
+		   ((#\T)	; Tab -- Implementation dependent
+		    (write-char ASCII-TAB port) 
+		    (anychar-dispatch (+ pos 1) arglist #f)
+		    )
+                   ((#\|)	; Page Seperator -- Implementation dependent
+                    (write-char ascii-ff port) ;; use form-feed char
+                    (anychar-dispatch (+ pos 1) arglist #t) ; counts as newline
+                    )
+		   ((#\G)	; Pretty-print {T}
+		    (if (eq? port #f)
+			(display (pretty-print-to-string (car arglist)) port)
+			(pretty-print (car arglist) port))
+		    (anychar-dispatch (+ pos 1) (cdr arglist) #t) ; check this!
+		    )
+		   ;; {"~?" in Common Lisp is "~K" in T}
+		   ((#\?)	; indirection -- take next arg as format string.
+		    (set! last-was-newline last-char-was-nl)
+		    (anychar-dispatch (+ pos 1) 
+				      (format-help (car arglist) (cdr arglist))
+				      last-was-newline)
+		                      ; Note: format-help returns unused args
+		    )
+		   (else
+                    (error "FORMAT: unknown tilde escape" 
+                           (string-ref format-strg pos)))
+		   )))
+	       )) ; end tilde-dispatch
+
+	    )			 
+
+	; FORMAT-HELP MAIN
+	(anychar-dispatch 0 arglyst last-was-newline)
+
+	)) ; end format-help
+
+
+    ; FORMAT MAIN
+    (format-help <format-string> <args>)
+    (return-value)
+    
+    ) ; end let
+))) ; end format
+
+
+
