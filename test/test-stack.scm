@@ -14,9 +14,9 @@
  |#
 
 (import (rnrs (6))
-        (oop)
-        (prefix (testing) test:)
-        (stack))
+        (lyonesse oop)
+        (prefix (lyonesse testing) test:)
+        (lyonesse stack))
 
 (test:unit "stack"
   ((S (make-stack)))

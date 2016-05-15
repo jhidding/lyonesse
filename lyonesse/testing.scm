@@ -13,7 +13,7 @@
  | limitations under the License.
  |#
 
-(library (testing)
+(library (lyonesse testing)
   (export run-test that unit)
 
   (import (rnrs (6))

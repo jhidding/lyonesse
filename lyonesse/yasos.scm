@@ -22,7 +22,7 @@
  | code is considered to be in the public domain.
  |#
 
-(library (yasos)
+(library (lyonesse yasos)
   (export 
     instance?
     define-predicate

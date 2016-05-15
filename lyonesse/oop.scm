@@ -2,7 +2,7 @@
  | 4th edition, section 12.8.
  |#
 
-(library (oop)
+(library (lyonesse oop)
   (export define-object send)
 
   (import (rnrs (6)))

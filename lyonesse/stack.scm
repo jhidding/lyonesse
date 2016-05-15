@@ -13,11 +13,11 @@
  | limitations under the License.
  |#
 
-(library (stack)
+(library (lyonesse stack)
   (export make-stack)
 
   (import (rnrs (6))
-          (oop))
+          (lyonesse oop))
 
   (define-object (make-stack)
     ([lst '()])
