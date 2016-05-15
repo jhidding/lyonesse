@@ -16,3 +16,7 @@ Experiments
 
 - Talking to Gtk3 libraries
 
+Licence
+-------
+Apache 2.0
+

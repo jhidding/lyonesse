@@ -1,4 +1,4 @@
-#| Copyright 1992 Ken Dickey, 2016 Johan Hidding
+#| Copyright 2016 Johan Hidding
  |
  | Licensed under the Apache License, Version 2.0 (the "License");
  | you may not use this file except in compliance with the License.
