@@ -2,10 +2,9 @@ Lyonesse - collection of modules for (Chez) scheme
 ==================================================
 
 This repository now contains these modules:
-
-    - testing
-    - oop
-    - yasos
+- testing
+- oop
+- yasos
 
 Prerequisites
 -------------
@@ -15,5 +14,5 @@ A R6RS compatible scheme with a decent set of SRFIs installed; I'm currently usi
 Experiments
 -----------
 
-    - Talking to Gtk3 libraries
+- Talking to Gtk3 libraries
 
