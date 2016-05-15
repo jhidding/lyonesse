@@ -1,3 +1,4 @@
+#!r6rs
 #| Copyright 2016 Johan Hidding
  |
  | Licensed under the Apache License, Version 2.0 (the "License");
