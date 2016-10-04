@@ -62,5 +62,9 @@
     (equal? '(4 -3 9) 
             ((compose list (splice ($ * <> 4) ($ - <> 5) ($ + <> 6))) 
              1 2 3)))
+
+  (test:that "pipe"
+    (= 25 (pipe (range 0 10) ($ map f <>) <- max))
+    (= 7  (pipe (div-and-mod 19 5) +)))
 )
 

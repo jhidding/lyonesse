@@ -14,8 +14,8 @@
  |#
 
 (import (rnrs (6))
-        (yasos)
-        (prefix (testing) test:)
+        (lyonesse yasos)
+        (prefix (lyonesse testing) test:)
         (srfi :48))
 
 (define-predicate lvector?)

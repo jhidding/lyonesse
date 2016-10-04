@@ -1,0 +1,15 @@
+BODY {background-color: #FFFFFF}
+A:link {color:blue; text-decoration:none}
+A:active {color:blue; text-decoration:none}
+A:visited {color:maroon; text-decoration:none}
+A:hover {color:white; text-decoration:none; background:blue}
+A.ref:link {color:blue; text-decoration:underline}
+A.ref:active {color:blue; text-decoration:underline}
+A.ref:visited {color:blue; text-decoration:underline}
+A.ref:hover {color:white; text-decoration:underline; background:blue}
+A.plainlink:link {color:blue; text-decoration:none}
+A.plainlink:active {color:blue; text-decoration:none}
+A.plainlink:visited {color:blue; text-decoration:none}
+A.plainlink:hover {color:white; text-decoration:none; background:blue}
+
+table.indent {margin-left: 20px}

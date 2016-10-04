@@ -16,7 +16,8 @@
 (library (lyonesse functional)
   (export $ <> <...> id thunk <- args compose splice juxt
           flip reverse-args
-          partial partial* on)
+          partial partial* on pipe
+          any? all?)
 
   (import (rnrs (6))
           (only (srfi :1 lists) append-reverse)
@@ -113,5 +114,20 @@
     (let ((rev (reverse X)))
       (lambda (Y)
         (apply f (append-reverse rev Y)))))
+
+  (define-syntax pipe
+    (lambda (x)
+      (syntax-case x ()
+        [(pipe <in>)
+         (syntax <in>)]
+        [(pipe <in> <func1> <funcs> ...)
+         (syntax (pipe (call-with-values (lambda () <in>) <func1>)
+                       <funcs> ...))])))
+
+  (define (any? proc lst)
+    (not (find proc lst))) 
+
+  (define (all? proc lst)
+    (not (find (compose not proc) lst)))
 )
 
