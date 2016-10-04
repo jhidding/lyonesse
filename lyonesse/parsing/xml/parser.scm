@@ -91,8 +91,9 @@
     [char-whitespace?   parse:attributes
                         (sb:close sb:new-list (sb:add '~))]
     [($ char=? #\? <>)  parse:close-datum
-                        (sb:close (sb:add '?) sb:close)]
+                        (sb:close (sb:add '(~)) (sb:add '?) sb:close)]
     [else               (parse:error parse:tag "XML syntax error.") ()])
+
   #| It's an opening tag! We parse the name of the tag. If a whitespace
    | follows we parse attributes to this tag, if it closes with '/' we
    | know it is a single datum, if not we enter a new XML context.
@@ -104,9 +105,9 @@
     [char-whitespace?   parse:attributes
                         (sb:close sb:new-list (sb:add '~))]
     [($ char=? #\/ <>)  parse:close-datum
-                        (sb:close sb:close)]
+                        (sb:close (sb:add '(~)) sb:close)]
     [($ char=? #\> <>)  parse:content
-                        (sb:close)]
+                        (sb:close (sb:add '(~)))]
     [else               (parse:error parse:tag "XML syntax error.") ()])
 
   #| We've found a single datum tag, the only valid thing to follow is
@@ -190,11 +191,26 @@
 
   (define-parser (parse:text ch)
     [eof-object?        (parse:error parse:text "Unexpected EOF.") ()]
+    [($ char=? #\& <>)  parse:text-special-char
+                        (($ sb:new (compose xml:special-char list->string) <>))]
     [($ char=? #\< <>)  parse:tag
                         (sb:close)]
     [else               parse:text
                         ((sb:add ch))])
 
+  (define-parser (parse:text-special-char ch)
+    [eof-object?        (parse:error parse:text-special-char "Unexpected EOF.") ()]
+    [($ char=? #\; <>)  parse:text
+                        (sb:close)]
+    [else               parse:text-special-char
+                        ((sb:add ch))])
+
+  (define (xml:special-char name)
+    (let* ([xml:chars '(("lt" . #\<)   ("amp" . #\&) ("gt" . #\>) 
+                        ("quot" . #\") ("apos" . #\'))]
+           [ch         (cdr (assoc name xml:chars))])
+      (if ch ch (error 'xml:special-char "Unknown XML special character." name))))
+      
   (define (xml:ast-from-port port)
     (parse:content (sb:start) port))
 )

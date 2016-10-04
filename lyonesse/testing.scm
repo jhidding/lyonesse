@@ -18,6 +18,7 @@
 
   (import (rnrs (6))
           (rnrs records syntactic (6))
+          (only (chezscheme) pretty-print pretty-initial-indent)
           (srfi :48))
 
   (define-record-type test
@@ -28,13 +29,15 @@
       [(_ <description> <expr1> ...)
        (make-test <description>
                   (list (lambda ()
-                          (format #t "    \x1b;[30;1m•\x1b;[m ~s" '<expr1>)
+                          (format #t "    \x1b;[30;1m•\x1b;[m ")
+                          (pretty-initial-indent 6)
+                          (pretty-print '<expr1>)
                           <expr1>) ...))]))
 
   (define (run-test test)
     (format #t "\x1b;[30;1m◇\x1b;[m ~a~%" (test-description test))
-    (for-each (lambda (t) (if (t) (format #t " \x1b;[32m✔\x1b;[m~%") 
-                            (format #t " \x1b;[31m✘\x1b;[m~%")))
+    (for-each (lambda (t) (if (t) (format #t "    \x1b;[32m✔\x1b;[m~%") 
+                            (format #t "    \x1b;[31m✘\x1b;[m~%")))
                 (test-assertions test)))
 
   (define-syntax unit

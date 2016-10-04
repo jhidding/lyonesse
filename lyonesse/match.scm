@@ -71,11 +71,8 @@
 
   (import (rnrs (6))
           (rnrs mutable-pairs (6))
-          ;(lyonesse aux-keyword)
           (only (chezscheme) syntax-error andmap add1 sub1 with-implicit
                              make-parameter last-pair make-list rec))
-
-  ;(define-auxiliary-keyword guard)
 
   (define match-equality-test
     (make-parameter
