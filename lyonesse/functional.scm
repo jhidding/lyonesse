@@ -17,7 +17,7 @@
   (export $ <> <...> id thunk <- args compose splice juxt
           flip reverse-args
           partial partial* on pipe
-          any? all?)
+          any? all? unique-sorted)
 
   (import (rnrs (6))
           (only (srfi :1 lists) append-reverse)
@@ -129,5 +129,18 @@
 
   (define (all? proc lst)
     (not (find (compose not proc) lst)))
+
+  (define (unique-sorted eq? input)
+    (if (null? input) 
+      '()
+      (let loop ([input  (cdr input)]
+                 [output (list (car input))])
+        (cond
+          [(null? input)
+           (reverse output)]
+          [(eq? (car input) (car output))
+           (loop (cdr input) output)]
+          [else
+           (loop (cdr input) (cons (car input) output))]))))
 )
 

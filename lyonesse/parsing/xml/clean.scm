@@ -1,6 +1,7 @@
 (library (lyonesse parsing xml clean)
   (export xml:clean)
   (import (rnrs base (6))
+          (only (srfi :13) string-trim-both)
           (lyonesse match)
           (lyonesse functional))
 
@@ -24,6 +25,6 @@
                                (map cons attrs valus)]
       [(,a ,[content] ...)     (guard (symbol? a))
                                (cons a content)]
-      [,a                      (guard (string? a)) a]
+      [,a                      (guard (string? a)) (string-trim-both a)]
       [,a                      (error 'xml:clean "XML AST is unclean." a)]))
 )

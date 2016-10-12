@@ -68,3 +68,13 @@
     (= 7  (pipe (div-and-mod 19 5) +)))
 )
 
+(test:unit "additional list functions"
+  ([evens '(2 4 4 6 8 8 10)])
+
+  (test:that "all?"
+    (all? even? evens)
+    (not (all? (lambda (i) (= 0 (mod i 4))) evens)))
+
+  (test:that "unique-sorted removes duplicates"
+    (equal? (unique-sorted = evens) '(2 4 6 8 10)))
+)

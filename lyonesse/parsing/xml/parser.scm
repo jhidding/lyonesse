@@ -180,7 +180,8 @@
     [eof-object?        (parse:error parse:string-esc-char "Unexpected EOF.") ()]
     [($ char=? #\" <>)  parse:string ((sb:add #\"))]
     [($ char=? #\n <>)  parse:string ((sb:add #\newline))]
-    [else               (parse:error parse:string-esc-char "Unknown escape character in string.") ()])
+    [else               (parse:error parse:string-esc-char
+                                     "Unknown escape character in string.") ()])
 
   (define-parser (parse:closing-tag ch)
     [eof-object?        (parse:error parse:closing-tag "Unexpected EOF.") ()]
