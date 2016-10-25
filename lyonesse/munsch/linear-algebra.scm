@@ -179,10 +179,8 @@
       [(and (number? a) (l:vector? b))    (l:vector-scale b a)]
       [(and (l:vector? a) (number? b))    (l:vector-scale a b)]))
 
-  (define (l:* . As)
-    (if (null? As)
-      (error 'l:* "Need something to multiply" As)
-      (fold-right l:mul-2 (car As) (cdr As))))
+  (define (l:* A . As)
+    (fold-right l:mul-2 A As))
 
   #| Output ================================================================ |#
   (define (format-l:matrix A)
