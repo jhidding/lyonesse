@@ -44,7 +44,7 @@
     (syntax-rules ()
       [(_ <description> ([<var> <expr>] ...)
           <test> ...)
-       (letrec [(<var> <expr>) ...]
+       (letrec* [(<var> <expr>) ...]
          (let ([tests (list <test> ...)])
            (format #t " - \x1b;[34;1m~a\x1b;[m - ~%" <description>)
            (for-each (lambda (f) (run-test f)) tests)))]))

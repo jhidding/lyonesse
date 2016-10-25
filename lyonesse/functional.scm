@@ -17,12 +17,18 @@
   (export $ <> <...> id thunk <- args compose splice juxt
           flip reverse-args
           partial partial* on pipe
-          any? all? unique-sorted)
+          any? all? unique-sorted unfold
+          
+          inc dec iota)
 
   (import (rnrs (6))
-          (only (srfi :1 lists) append-reverse)
+          (only (srfi :1 lists) append-reverse unfold)
           (rename (lyonesse cut) (cut $)))
 
+
+  (define (inc x) (+ x 1))
+  (define (dec x) (- x 1))
+  (define (iota n) (unfold ($ = <> n) id inc 0))
 
   #| identity function
    |   @(param x) any value
@@ -34,7 +40,7 @@
    |   @(param x) any value
    |   @(returns) a function returning @(ref x)
    |#
-  (define (thunk x) (lambda () x))
+  (define (thunk x) (lambda _ x))
 
   #| forward result as values
    |   @(param x) a list
