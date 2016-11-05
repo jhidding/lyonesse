@@ -3,15 +3,15 @@
   (export make-nd-range nd-range? 
           nd-range-offset nd-range-index
           nd-range-shape nd-range-carry
-          nd-range-values nd-range-end?
-          nd-range-step)
+          nd-range-end? nd-range-step)
           
   (import (rnrs base (6))
           (rnrs lists (6))
           (rnrs control (6))
           (rnrs records syntactic (6))
           
-          (lyonesse functional))
+          (lyonesse functional)
+          (lyonesse record-with-context))
 
   #|! Not equal to, really this should be in the standard.
    |#
@@ -78,7 +78,7 @@
    |    `shape`, it is set back to 0, and the `carry` is added as an extra to
    |    the `offset`.
    |#
-  (define-record-type nd-range
+  (define-record-with-context nd-range
     (fields offset index shape carry)
 
     (protocol
@@ -90,12 +90,6 @@
                                       (compute-carry shape stride))]
           [(offset index shape carry)
            (new offset index shape carry)]))))
-
-  (define (nd-range-values n)
-    (values (nd-range-offset n)
-            (nd-range-index n)
-            (nd-range-shape n)
-            (nd-range-carry n)))
 
   #|! Checks if an iterator reached the end of the array. The `nd-range-step`
    |  function sets the `offset` field to `#xffffffff` when this happens.
@@ -119,24 +113,24 @@
    |     -> (1 2 5 7 9 11)
    |#
   (define (nd-range-step n)
-    (let-values ([(offset index shape* carry*) (nd-range-values n)])
-      (let loop ([offset   (+ offset (car (reverse carry*)))]
-                 [lo-index (list (+ 1 (car (reverse index))))]
+    (with-nd-range n
+      (let loop ([offset   (+ offset (car (reverse carry)))]
+                 [lo-index (list (inc (car (reverse index))))]
                  [hi-index (cdr (reverse index))]
-                 [shape    (reverse shape*)]
-                 [carry    (cdr (reverse carry*))])
+                 [shape*   (reverse shape)]
+                 [carry*   (cdr (reverse carry))])
         (cond
           ; we did not move past the end on this axis
           [(/= (car lo-index) 
-               (car shape))   (make-nd-range offset 
+               (car shape*))  (make-nd-range offset
                                         (reverse-append hi-index lo-index) 
-                                        shape* carry*)]
+                                        shape carry)]
           ; we moved pased the end of the array, set offset to FFFFFFFF
           [(null? hi-index)   (make-nd-range #xffffffff
                                         (reverse-append hi-index lo-index)
-                                        shape* carry*)]
+                                        shape carry)]
           ; we moved past the end of an axis.
-          [else               (loop (+ offset (car carry))
-                                   `(,(+ 1 (car hi-index)) 0 . ,(cdr lo-index))
-                                    (cdr hi-index) (cdr shape) (cdr carry))]))))
+          [else               (loop (+ offset (car carry*))
+                                   `(,(inc (car hi-index)) 0 . ,(cdr lo-index))
+                                    (cdr hi-index) (cdr shape*) (cdr carry*))]))))
 )

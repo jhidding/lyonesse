@@ -19,7 +19,7 @@
           partial partial* on pipe
           any? all? unique-sorted unfold
           
-          inc dec iota)
+          inc dec iota receive)
 
   (import (rnrs (6))
           (only (srfi :1 lists) append-reverse unfold)
@@ -148,5 +148,12 @@
            (loop (cdr input) output)]
           [else
            (loop (cdr input) (cons (car input) output))]))))
+
+  ;;; (srfi :8 receive)
+  (define-syntax receive
+   (syntax-rules ()
+     ((receive formals expression body ...)
+      (call-with-values (lambda () expression)
+                        (lambda formals body ...))))) 
 )
 

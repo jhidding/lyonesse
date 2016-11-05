@@ -3,8 +3,8 @@
 
   (import (rnrs base (6))
           (rnrs syntax-case (6))
-          (rnrs records syntactic (6)))
-
+          (rnrs records syntactic (6))
+          (only (chezscheme) trace-define-syntax))
   #| Define a syntactic record type and a context manager.  A R6RS record type
    | comes with accessor functions; for example if we create the record
    | `my-vector` containing the fields `x` and `y` we get accessors `my-vector-x`
@@ -45,19 +45,33 @@
 
       (syntax-case x (fields)
         [(define-record-with-context <name> (fields <f> ...) <args> ...)
-         (with-syntax ([context-manager (gen-id #'<name> "with-" #'<name>)]
+         (with-syntax ([with-record     (gen-id #'<name> "with-" #'<name>)]
+                       [update-record   (gen-id #'<name> "update-" #'<name>)]
+                       [make-record     (gen-id #'<name> "make-" #'<name>)]
                        ; Define the names of member access functions.
                        [(access ...)    (map (lambda (x) 
                                                (gen-id x #'<name> "-" x))
                                              #'(<f> ...))])
            #'(begin
                (define-record-type <name> (fields <f> ...) <args> ...)
-               (define-syntax context-manager
+
+               (define-syntax with-record
                  (lambda (x)
                    (syntax-case x ()
-                     [(context-manager <r> <expr> (... ...))
-                      (with-syntax ([<f> (datum->syntax #'context-manager '<f>)]
+                     [(with-record <r> <expr> (... ...))
+                      (with-syntax ([<f> (datum->syntax #'with-record '<f>)]
                                     ...)
                         #'(let ([<f> (access <r>)] ...)
-                            <expr> (... ...)))])))))])))
+                            <expr> (... ...)))])))
+               
+               (define-syntax update-record
+                 (lambda (x)
+                   (syntax-case x ()
+                     [(update-record <r> <bindings> (... ...))
+                      (with-syntax ([<f> (datum->syntax #'update-record '<f>)]
+                                    ...)
+                        #'(let ([<f> (access <r>)] ...)
+                            (let (<bindings> (... ...)) 
+                              (make-record <f> ...))))])))
+               ))])))
 )

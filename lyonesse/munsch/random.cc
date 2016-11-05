@@ -21,3 +21,8 @@ extern "C" int random_integer(int a, int b)
     return std::uniform_int_distribution<int>(a, b)(random_engine);
 }
 
+extern "C" double random_uniform_real(double a, double b)
+{
+    return std::uniform_real_distribution<double>(a, b)(random_engine);
+}
+

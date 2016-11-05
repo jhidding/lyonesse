@@ -6,7 +6,11 @@
           l:matrix? make-l:matrix l:matrix-m l:matrix-n l:matrix-data
           l:matrix-ref l:matrix-set! l:m l:eye
 
-          l:* l:T l:vector->row-matrix l:vector->column-matrix
+          l:dot l:* l:T l:vector->row-matrix l:vector->column-matrix
+          l:map l:+ l:-
+
+          l:matrix->f32array l:vector->f32array
+          f32array->l:matrix f32array->l:vector
 
           l:print)
 
@@ -17,19 +21,17 @@
           (rnrs syntax-case (6))
           (rnrs bytevectors (6))
           (rnrs records syntactic (6))
-          (only (chezscheme) trace-define-syntax)
           (srfi :48)
 
           (lyonesse functional)
-          (lyonesse strings))
+          (lyonesse ranges)
+          (lyonesse strings)
+          (lyonesse record-with-context)
+          (lyonesse munsch slice)
+          (lyonesse munsch f32array))
 
-  (define bv-sp-ref  bytevector-ieee-single-native-ref)
-  (define bv-sp-set! bytevector-ieee-single-native-set!)
-  (define bv-dp-ref  bytevector-ieee-double-native-ref)
-  (define bv-dp-set! bytevector-ieee-double-native-set!)
- 
   #| Vector essentials ===================================================== |#
-  (define-record-type l:vector
+  (define-record-with-context l:vector
     (fields length data)
     (protocol
       (lambda (new)
@@ -38,10 +40,10 @@
           [(l data) (new l data)]))))
 
   (define (l:vector-ref v n)
-    (bv-sp-ref (l:vector-data v) (* n 4)))
+    (f32vector-ref (l:vector-data v) n))
 
   (define (l:vector-set! v n x)
-    (bv-sp-set! (l:vector-data v) (* n 4) x))
+    (f32vector-set! (l:vector-data v) n x))
 
   #| Vector construction =================================================== |#
   (define-syntax l:v
@@ -51,10 +53,23 @@
          #`(let* ([v (make-l:vector #,(length #'(<xs> ...)))]
                   [d (l:vector-data v)])
              #,@(map (lambda (x n)
-                       #`(bv-sp-set! d #,(* 4 n) #,x))
+                       #`(f32vector-set! d #,n #,x))
                   #'(<xs> ...) 
                   (iota (length #'(<xs> ...))))
              v)])))
+
+  (define (l:vector->f32array v)
+    (with-l:vector v (make-f32array (make-slice (list length)) data)))
+
+  (define (f32array->l:vector a)
+    (with-f32array a
+      (unless (= 1 (slice-dimension slice))
+        (error 'f32array->l:vector "Array should be one-dimensional." a))
+      (with-slice slice
+        (make-l:vector (car shape) 
+                       (if (slice-contiguous? slice)
+                         data
+                         (f32array-copy-data a))))))
 
   #| Vector operations ===================================================== |#
   (define (l:vector-scale a s)
@@ -65,13 +80,13 @@
                 (iota l))
       b))
 
-  (define (l:dot-product a b)
+  (define (l:dot  a b)
     (apply + (map (lambda (i)
                     (* (l:vector-ref a i) (l:vector-ref b i)))
                   (iota (l:vector-length a)))))
 
   #| Matrix essentials ===================================================== |#
-  (define-record-type l:matrix
+  (define-record-with-context l:matrix
     (fields m n data)   ; m rows, n columns
     (protocol
       (lambda (new)
@@ -80,11 +95,25 @@
           [(m n data) (new m n data)]))))
 
   (define (l:matrix-ref A i j)
-    (bv-sp-ref (l:matrix-data A) (* (+ j (* i (l:matrix-n A))) 4)))
+    (f32vector-ref (l:matrix-data A) (+ j (* i (l:matrix-n A)))))
 
   (define (l:matrix-set! A i j v)
-    (bv-sp-set! (l:matrix-data A) (* (+ j (* i (l:matrix-n A))) 4) v))
- 
+    (f32vector-set! (l:matrix-data A) (+ j (* i (l:matrix-n A))) v))
+
+  (define (l:matrix->f32array A)
+    (with-l:matrix A
+      (make-f32array (make-slice (list m n)) data)))
+
+  (define (f32array->l:matrix a)
+    (with-f32array a
+      (unless (= 2 (slice-dimension slice))
+        (error 'f32array->l:matrix "Array should be two-dimensional." a))
+      (with-slice slice
+        (make-l:matrix (car shape) (cadr shape) 
+                       (if (slice-contiguous? slice)
+                         data
+                         (f32array-copy-data a))))))
+
   #| Matrix construction =================================================== |#
   (define-syntax l:m
     (lambda (x)
@@ -95,39 +124,34 @@
            #`(let* ([A (make-l:matrix <m> <n>)]
                     [d (l:matrix-data A)])
                #,@(map (lambda (x n)
-                         #`(bv-sp-set! d #,(* 4 n) #,x))
+                         #`(f32vector-set! d #,n #,x))
                     (apply append #'((<row1> ...) ...))
                     (iota (* #'<m> #'<n>)))
                 A))])))
 
   (define (l:eye n)
     (let ([A (make-l:matrix n n)])
-      (for-each (lambda (i)
-                  (for-each (lambda (j)
-                              (l:matrix-set! A i j (if (= i j) 1 0)))
-                            (iota n)))
-                (iota n))
+      (for-range (lambda (i)
+        (for-range (lambda (j)
+          (l:matrix-set! A i j (if (= i j) 1 0)))
+          n))
+        n)
       A))
 
   #| Matrix operations ===================================================== |#
   (define (l:matrix-scale A s)
-    (let* ([m (l:matrix-m A)] [n (l:matrix-n A)]
-           [C (make-l:matrix n m)])
-      (for-each (lambda (i)
-                  (bv-sp-set!
-                    (l:matrix-data C) (* i 4)
-                    (bv-sp-ref (l:matrix-data A) (* i 4))))
-                (iota (* m n)))
-      C))
+    (with-l:matrix A
+      (make-l:matrix n m (f32vector-map ($ * s <>) data))))
 
   (define (l:matrix-transpose A)
     (let* ([m (l:matrix-m A)] [n (l:matrix-n A)]
            [C (make-l:matrix n m)])
-      (for-each (lambda (i)
-        (for-each (lambda (j)
+      (for-range (lambda (i)
+        (for-range (lambda (j)
           (l:matrix-set! C i j (l:matrix-ref A j i)))
-          (iota m)))
-        (iota n))))
+          m))
+        n)
+      C))
 
   (define (l:matrix-mul A B)
     (let* ([m (l:matrix-m A)] [n (l:matrix-n A)]
@@ -135,14 +159,14 @@
            [C (make-l:matrix m q)])
       (unless (= n p)
         (error 'l:matrix-mul "Matrix dimensions do not match." A B))
-      (for-each (lambda (i)
-        (for-each (lambda (j)
-          (l:matrix-set! C i j (apply + (map (lambda (k)
+      (for-range (lambda (i)
+        (for-range (lambda (j)
+          (l:matrix-set! C i j (apply + (map-range (lambda (k)
                                               (* (l:matrix-ref A i k)
                                                  (l:matrix-ref B k j)))
-                                            (iota n)))))
-          (iota q)))
-        (iota m))
+                                            n))))
+          q))
+        m)
       C))
 
   #| Matrix <-> Vector ===================================================== |#
@@ -175,34 +199,36 @@
                                             (l:matrix-mul a (l:vector->column-matrix b)))]
       [(and (l:vector? a) (l:matrix? b))  (l:matrix->vector
                                             (l:matrix-mul (l:vector->row-matrix a) b))]
-      [(and (l:vector? a) (l:vector? b))  (l:dot-product a b)]
+      [(and (l:vector? a) (l:vector? b))  (l:dot a b)]
       [(and (number? a) (l:vector? b))    (l:vector-scale b a)]
       [(and (l:vector? a) (number? b))    (l:vector-scale a b)]))
 
   (define (l:* A . As)
     (fold-right l:mul-2 A As))
 
-  #| Output ================================================================ |#
-  (define (format-l:matrix A)
-    (string-append "[" 
-      (string-join "\n "
-        (map (lambda (i)
-          (string-append "["
-            (string-join " "
-              (map (lambda (j)
-                (format #f "~a" (l:matrix-ref A i j)))
-                (iota (l:matrix-n A)))) "]"))
-          (iota (l:matrix-m A)))) "]"))
+  (define (l:map f x . xs)
+    (cond
+      [(l:matrix? x)
+       (with-l:matrix x
+         (make-l:matrix m n (apply f32vector-map f 
+                                   (map l:matrix-data (cons x xs)))))]
+      [(l:vector? x)
+       (with-l:vector x
+         (make-l:vector length (apply f32vector-map f
+                                      (map l:vector-data (cons x xs)))))]))
 
-  (define (format-l:vector v)
-    (string-append "["
-      (string-join " "
-        (map (lambda (i)
-               (format #f "~a" (l:vector-ref v i)))
-             (iota (l:vector-length v)))) "]"))
+  (define (l:+ . args) (apply l:map + args))
+  (define (l:- . args) (apply l:map - args))
+
+  #| Output ================================================================ |#
+  (define (l:matrix-format A)
+    (f32array-format (l:matrix->f32array A)))
+
+  (define (l:vector-format v)
+    (f32array-format (l:vector->f32array v)))
 
   (define (l:print A)
     (cond
-      [(l:matrix? A) (display (format-l:matrix A))]
-      [(l:vector? A) (display (format-l:vector A))]))
+      [(l:matrix? A) (display (l:matrix-format A))]
+      [(l:vector? A) (display (l:vector-format A))]))
 )

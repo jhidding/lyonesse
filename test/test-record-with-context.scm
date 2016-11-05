@@ -25,4 +25,12 @@
     (let ([a (make-A (make-p 1 2 3) 4)])
       (= 1 (with-A a (with-p p k)))
       (= 3 (with-A a (with-p p m)))
-      (= 4 (with-A a q)))))
+      (= 4 (with-A a q))))
+
+  (test:that "updating works"
+    (let* ([a (make-A (make-p 1 2 3) 4)]
+           [b (update-A a (q 8) (p (update-p p (l 42))))])
+      (= 8  (with-A a q))
+      (= 42 (with-A a (with-p p l)))
+      (= 3  (with-A a (with-p p m)))))
+)
