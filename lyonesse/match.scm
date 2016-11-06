@@ -7,10 +7,10 @@
 ;;; publish, distribute, sublicense, and/or sell copies of the Software,
 ;;; and to permit persons to whom the Software is furnished to do so,
 ;;; subject to the following conditions:
-;;; 
+;;;
 ;;; The above copyright notice and this permission notice shall be
 ;;; included in all copies or substantial portions of the Software.
-;;; 
+;;;
 ;;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 ;;; EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 ;;; MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -20,7 +20,7 @@
 ;;; CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 ;;; SOFTWARE.
 
-;;; This program was originally designed and implemented by Dan Friedman. 
+;;; This program was originally designed and implemented by Dan Friedman.
 ;;; It was redesigned and reimplemented by Erik Hilsdale.  Additional
 ;;; modifications were made by Kent Dybvig, Steve Ganz, and Aziz Ghuloum.
 ;;; Parts of the implementation were adapted from the portable syntax-case
@@ -71,8 +71,8 @@
 
   (import (rnrs (6))
           (rnrs mutable-pairs (6))
-          (only (chezscheme) syntax-error andmap add1 sub1 with-implicit
-                             make-parameter last-pair make-list rec))
+
+          (lyonesse match compat))
 
   (define match-equality-test
     (make-parameter
@@ -118,7 +118,7 @@
     (syntax-rules ()
       ((_ () B0 B ...) (begin B0 B ...))
       ((_ ((Formals Exp) Rest ...) B0 B ...)
-       (let-values** (Rest ...) 
+       (let-values** (Rest ...)
          (call-with-values (lambda () Exp)
            (lambda Formals B0 B ...))))))
 
@@ -129,12 +129,12 @@
          #'(error 'match "Unmatched datum: ~s" Obj))
         ((_ Template Cata Obj ThreadedIds (Pat B0 B ...) Rest ...)
          #'(convert-pat Pat
-             (match-help1 Template Cata Obj ThreadedIds 
+             (match-help1 Template Cata Obj ThreadedIds
                (B0 B ...)
                Rest ...)))
         ((_ Template Cata Obj ThreadedIds cls Rest ...)
          (syntax-error #'cls "invalid match clause")))))
-      
+
 
   (define-syntax match-help1
     (lambda (x)
@@ -321,7 +321,7 @@
              (lambda (Formal ...)
                (with-syntax ((Formal Formal) ...)
                  (let-synvalues* (Decl ...) B0 B ...)))))))
-      (lambda (syn) 
+      (lambda (syn)
         (syntax-case syn ()
           ((_ syn (kh . kt))
            (let-synvalues* (((Pat Vars Guards Cdecls) (f #'syn '() '() '() 0)))
@@ -609,7 +609,7 @@
                       (fail)))
                  ((each)
                   ;; if infinite, copy the list as flat, then do the matching,
-                  ;; then do some set-cdrs. 
+                  ;; then do some set-cdrs.
                   (let ((each-pat (vector-ref pat 1))
                         (each-size (vector-ref pat 2)))
                     (case (classify-list obj)
@@ -670,7 +670,7 @@
 ;;; examples of passing along threaded information.
 
 ;;; Try (collect-symbols '(if (x y 'a 'c zz) 'b 'c))
-;;; Note that it commonizes the reference to c. 
+;;; Note that it commonizes the reference to c.
 #|
 (define-syntax with-values
   (syntax-rules ()
@@ -716,7 +716,7 @@
       (,x
         (cons x acc)))))
 
-;; here's something that takes apart quoted stuff. 
+;; here's something that takes apart quoted stuff.
 
 (define destruct
   (lambda (datum)
@@ -734,20 +734,20 @@
 
 (define sumsquares
   (lambda (ls)
-    (define square 
+    (define square
       (lambda (x)
         (* x x)))
-    (match ls 
+    (match ls
       [(,[a*] ...) (apply + a*)]
       [,[square -> n] n])))
 
 (define sumsquares
   (lambda (ls)
-    (define square 
+    (define square
       (lambda (x)
         (* x x)))
     (let ([acc 0])
-      (match+ (acc) ls 
+      (match+ (acc) ls
         [(,[] ...) acc]
         [,[(lambda (acc x) (+ acc (square x))) ->] acc]))))
 
@@ -837,7 +837,7 @@
 ;; (1 2 3 5)
 ;; ;;
 ;; > (parameterize ([match-equality-test (lambda (x y) (equal? x (reverse y)))])
-;;     (match '((1 2 3) (3 2 1))   
+;;     (match '((1 2 3) (3 2 1))
 ;;       [(,a ,a) 'yes]
 ;;       [,oops 'no]))
 ;; yes
@@ -875,7 +875,7 @@
 ;; Matcher now handles vector patterns.  Quasiquote also handles
 ;; vector patterns, but does NOT do the csv6.2 optimization of
 ;; `#(a 1 ,(+ 3 4) x y) ==> (vector 'a 1 (+ 3 4) 'x 'y).
-;; Also fixed bug in (P ... . P) matching code. 
+;; Also fixed bug in (P ... . P) matching code.
 
 ;; [23 Feb 2000]
 ;; KSM fixed bug in unquote-splicing inside quasiquote.
@@ -885,7 +885,7 @@
 ;; The pattern (P ... . P) now works the way you might expect.
 ;; Infinite lists are now properly matched (and not matched).
 ;; Removed the @ pattern.
-;; Internal: No longer converting into syntax-case. 
+;; Internal: No longer converting into syntax-case.
 
 ;; [6 Feb 2000]
 ;; Added expansion-time error message for referring to cata variable
@@ -906,7 +906,7 @@
 ;; Recognized unquote-splicing and signalled errors in the appropriate places.
 ;; Added support for deep elipses in backquote.
 ;; Rewrote backquote so it does the rebuilding directly instead of
-;; expanding into Chez's backquote. 
+;; expanding into Chez's backquote.
 
 ;; [31 Jan 2000]
 ;; Kent Dybvig fixed template bug.
