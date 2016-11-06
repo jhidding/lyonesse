@@ -1,26 +1,26 @@
 (library (lyonesse munsch f32array)
 
-  (export make-f32vector f32vector-map f32vector-reduce 
+  (export make-f32vector f32vector-map f32vector-reduce
           f32vector-set! f32vector-ref f32v
 
           make-f32array f32array? f32array-slice f32array-data with-f32array update-f32array
           make-slice slice? slice-shape slice-stride slice-size slice-offset
-          f32array-ref f32array-refx f32array-iterator 
-          
+          f32array-ref f32array-refx f32array-iterator
+
           f32array-set! f32array-shape f32array-bytesize
 
           ;;; copying for reuse
           f32array-copy-data
-          
+
           ;;; setters
           f32array-copy! f32array-setx!
 
           ;;; syntax helpers
           f32a f32array-cut
-          
+
           ;;; formated output
           f32array-format print-f32array)
-          
+
   (import (rnrs base (6))
           (rnrs syntax-case (6))
           (rnrs lists (6))
@@ -59,10 +59,10 @@
            #`(let* ([d (make-bytevector (* 4 <length>))])
                #,@(map (lambda (x n)
                        #`(bv-sp-set! d #,(* 4 n) #,x))
-                  #'(<xs> ...) 
+                  #'(<xs> ...)
                   (iota #'<length>))
                d))])))
-  
+
   (define (f32vector-map f . args)
     (let* ([n (bytevector-length (car args))]
            [c (make-bytevector n)])
@@ -93,8 +93,8 @@
 
   (define (f32array-format a)
     (if (= 1 (f32array-dimension a))
-      (string-append 
-        "[" (string-join 
+      (string-append
+        "[" (string-join
               " " (map-range (lambda (i)
                                (number->string
                                  (f32array-refx a (i))))
@@ -151,7 +151,7 @@
       (let loop ([i (f32array-iterator a)]
                  [j 0])
         (unless (nd-range-end? i)
-          (f32vector-set! data j 
+          (f32vector-set! data j
             (f32vector-ref (f32array-data a) (nd-range-offset i)))
           (loop (nd-range-step i) (inc j))))))
 
@@ -194,7 +194,7 @@
                   [d (f32array-data v)])
              #,@(map (lambda (x n)
                        #`(bv-sp-set! d #,(* 4 n) #,x))
-                  #'(<xs> ...) 
+                  #'(<xs> ...)
                   (iota (length #'(<xs> ...))))
              v)])))
 )

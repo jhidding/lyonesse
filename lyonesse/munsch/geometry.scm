@@ -103,7 +103,7 @@
                 (g:make-vector (f32vector-map - (g:vector-data a)
                                                 (g:vector-data b)))]
 
-               [else (error 'g:- "Type error: need point and point 
+               [else (error 'g:- "Type error: need point and point
                                   or vector and vector." a b)])]))
 
   (define (g:+ a b)
@@ -115,8 +115,8 @@
       [(and (g:vector? a) (g:vector? b))
        (g:make-vector (f32vector-map + (g:vector-data a)
                                        (g:vector-data b)))]
-      
-      [else (error 'g:+ "Type error: need point and vector 
+
+      [else (error 'g:+ "Type error: need point and vector
                    or vector and vector." a b)]))
 
   (define (g:dot a b)

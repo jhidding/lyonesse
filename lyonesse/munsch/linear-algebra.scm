@@ -54,7 +54,7 @@
                   [d (l:vector-data v)])
              #,@(map (lambda (x n)
                        #`(f32vector-set! d #,n #,x))
-                  #'(<xs> ...) 
+                  #'(<xs> ...)
                   (iota (length #'(<xs> ...))))
              v)])))
 
@@ -66,7 +66,7 @@
       (unless (= 1 (slice-dimension slice))
         (error 'f32array->l:vector "Array should be one-dimensional." a))
       (with-slice slice
-        (make-l:vector (car shape) 
+        (make-l:vector (car shape)
                        (if (slice-contiguous? slice)
                          data
                          (f32array-copy-data a))))))
@@ -90,7 +90,7 @@
     (fields m n data)   ; m rows, n columns
     (protocol
       (lambda (new)
-        (case-lambda 
+        (case-lambda
           [(m n) (new m n (make-bytevector (* m n 4)))]
           [(m n data) (new m n data)]))))
 
@@ -109,7 +109,7 @@
       (unless (= 2 (slice-dimension slice))
         (error 'f32array->l:matrix "Array should be two-dimensional." a))
       (with-slice slice
-        (make-l:matrix (car shape) (cadr shape) 
+        (make-l:matrix (car shape) (cadr shape)
                        (if (slice-contiguous? slice)
                          data
                          (f32array-copy-data a))))))
@@ -210,7 +210,7 @@
     (cond
       [(l:matrix? x)
        (with-l:matrix x
-         (make-l:matrix m n (apply f32vector-map f 
+         (make-l:matrix m n (apply f32vector-map f
                                    (map l:matrix-data (cons x xs)))))]
       [(l:vector? x)
        (with-l:vector x

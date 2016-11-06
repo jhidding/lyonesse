@@ -8,6 +8,9 @@
                              make-guardian
                              collect-request-handler collect))
 
+  ;(define-record-type (box box box?)
+  ;  (fields (mutable element unbox set-box!))) 
+
   (define (do-malloc size)
     (box (foreign-alloc size)))
 

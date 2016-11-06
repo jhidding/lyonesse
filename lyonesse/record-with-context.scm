@@ -10,8 +10,8 @@
    | `my-vector` containing the fields `x` and `y` we get accessors `my-vector-x`
    | and `my-vector-y`. Now if we want to use both values in some context we're
    | supoosed to say:
-   | 
-   | > (define (my-vector-length p) 
+   |
+   | > (define (my-vector-length p)
    |     (let ([x (my-vector-x p)]
    |           [y (my-vector-y p)])
    |       (sqrt (+ (* x x) (* y y)))))
@@ -49,7 +49,7 @@
                        [update-record   (gen-id #'<name> "update-" #'<name>)]
                        [make-record     (gen-id #'<name> "make-" #'<name>)]
                        ; Define the names of member access functions.
-                       [(access ...)    (map (lambda (x) 
+                       [(access ...)    (map (lambda (x)
                                                (gen-id x #'<name> "-" x))
                                              #'(<f> ...))])
            #'(begin
@@ -63,7 +63,7 @@
                                     ...)
                         #'(let ([<f> (access <r>)] ...)
                             <expr> (... ...)))])))
-               
+
                (define-syntax update-record
                  (lambda (x)
                    (syntax-case x ()
@@ -71,7 +71,7 @@
                       (with-syntax ([<f> (datum->syntax #'update-record '<f>)]
                                     ...)
                         #'(let ([<f> (access <r>)] ...)
-                            (let (<bindings> (... ...)) 
+                            (let (<bindings> (... ...))
                               (make-record <f> ...))))])))
                ))])))
 )
