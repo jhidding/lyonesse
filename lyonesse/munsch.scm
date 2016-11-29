@@ -39,6 +39,7 @@
      |         -> (1.4142135381698608 3.142857074737549)
      |#
     array-ref array-set! bytearray array->list
+    array-head array-tail array-empty?
 
     #| Structs
      | =======

@@ -1,7 +1,10 @@
 (library (lyonesse munsch array)
   (export array-type? make-array-type array-type-element-type array-type-length array-set!
           array? make-array array-element-type array-data array-offset array-length array-ref
-          with-array bytearray array->list)
+          with-array bytearray array->list
+
+          ;;; iterator routines
+          array-head array-tail array-empty?)
 
   (import (rnrs (6))
           (lyonesse ranges)
@@ -39,6 +42,22 @@
 
   (define-record-with-context array
     (fields element-type data offset length))
+
+  (define (array-head a)
+    (with-array a
+      (with-type element-type
+        (ref data offset))))
+
+  (define array-tail
+    (case-lambda
+      ((a) (array-tail a 1))
+      ((a n)
+       (with-array a
+         (with-type element-type
+           (make-array element-type data (+ offset (* n bytesize) (- length n))))))))
+
+  (define (array-empty? a)
+    (zero? (array-length a)))
 
   (define (array-ref a x)
     (with-array a
